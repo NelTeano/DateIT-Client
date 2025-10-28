@@ -5,7 +5,8 @@ import { SocketProvider } from '../context/SocketContext'
 export default function ChatPage() {
   return (
     // <SocketProvider userId={currentUserId}>
-        <ChatRoom />
+        // <ChatRoom />
     // </SocketProvider>
+    <></>
   )
 }
