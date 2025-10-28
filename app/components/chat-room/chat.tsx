@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, ArrowLeft, MoreVertical, Heart, AlertCircle } from 'lucide-react';
-import { useSocket } from '../context/SocketContext';
+// import { useSocket } from '../context/SocketContext';
 
 
 export default function ChatRoom() {
@@ -13,7 +13,7 @@ export default function ChatRoom() {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-  const { socket, isConnected } = useSocket();
+  // const { socket, isConnected } = useSocket();
 
   // Mock data - replace with actual API calls and match ID from URL
   const currentUserId = 'user1';

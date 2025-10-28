@@ -17,11 +17,14 @@ export default function AuthPages() {
     agreeTerms: false
   });
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = <K extends keyof typeof formData>(
+    field: K,
+    value: typeof formData[K]
+  ) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleVerificationInput = (index, value) => {
+  const handleVerificationInput = (index: number, value: string) => {
     if (value.length > 1) value = value[0];
     if (!/^\d*$/.test(value)) return;
 
@@ -34,7 +37,7 @@ export default function AuthPages() {
     }
   };
 
-  const handleVerificationKeyDown = (index, e) => {
+  const handleVerificationKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Backspace' && !verificationCode[index] && index > 0) {
       document.getElementById(`code-${index - 1}`)?.focus();
     }
@@ -167,7 +170,7 @@ export default function AuthPages() {
 
             <div className="mt-6 text-center">
               <p className="text-gray-600">
-                Don't have an account?{' '}
+                Dont have an account?{' '}
                 <button
                   onClick={() => setCurrentPage('register')}
                   className="text-pink-600 hover:text-pink-700 font-semibold"
@@ -338,7 +341,7 @@ export default function AuthPages() {
               </div>
               <h1 className="text-3xl font-bold text-gray-800 mb-2">Verify Your Email</h1>
               <p className="text-gray-600">
-                We've sent a 6-digit code to
+                Weve sent a 6-digit code to
                 <br />
                 <span className="font-semibold text-gray-800">{email || 'your@email.com'}</span>
               </p>
@@ -355,7 +358,7 @@ export default function AuthPages() {
                       key={index}
                       id={`code-${index}`}
                       type="text"
-                      maxLength="1"
+                      maxLength={1}
                       value={digit}
                       onChange={(e) => handleVerificationInput(index, e.target.value)}
                       onKeyDown={(e) => handleVerificationKeyDown(index, e)}
@@ -375,7 +378,7 @@ export default function AuthPages() {
             </div>
 
             <div className="mt-6 text-center">
-              <p className="text-gray-600 text-sm mb-2">Didn't receive the code?</p>
+              <p className="text-gray-600 text-sm mb-2">Didnt receive the code?</p>
               <button 
                 onClick={() => {
                   setVerificationCode(['', '', '', '', '', '']);
@@ -389,7 +392,7 @@ export default function AuthPages() {
 
             <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
               <p className="text-xs text-blue-800 text-center">
-                💡 Check your spam folder if you don't see the email in your inbox
+                💡 Check your spam folder if you dont see the email in your inbox
               </p>
             </div>
           </div>
