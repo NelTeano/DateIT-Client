@@ -1,12 +1,11 @@
 'use client';
 import React, { useState } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, Check, Heart } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, Heart } from 'lucide-react';
 
 export default function AuthPages() {
   const [currentPage, setCurrentPage] = useState('login');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
   const [email, setEmail] = useState('');
   const [formData, setFormData] = useState({
     name: '',
@@ -14,8 +13,13 @@ export default function AuthPages() {
     password: '',
     confirmPassword: '',
     rememberMe: false,
-    agreeTerms: false
+    agreeTerms: false,
+    age: '',
+    bio: '',
+    photoUrl: ''
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleInputChange = <K extends keyof typeof formData>(
     field: K,
@@ -24,72 +28,131 @@ export default function AuthPages() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleVerificationInput = (index: number, value: string) => {
-    if (value.length > 1) value = value[0];
-    if (!/^\d*$/.test(value)) return;
-
-    const newCode = [...verificationCode];
-    newCode[index] = value;
-    setVerificationCode(newCode);
-
-    if (value && index < 5) {
-      document.getElementById(`code-${index + 1}`)?.focus();
-    }
-  };
-
-  const handleVerificationKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !verificationCode[index] && index > 0) {
-      document.getElementById(`code-${index - 1}`)?.focus();
-    }
-  };
-
-  const handleRegisterSubmit = () => {
+  const handleRegisterSubmit = async () => {
+    console.log('Register payload:', formData); // ✅ add this
+    setError('');
+    
     if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-      alert('Please fill in all fields');
+      setError('Please fill in all fields');
       return;
     }
-    if (formData.password.length < 8) {
-      alert('Password must be at least 8 characters');
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
       return;
     }
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
     if (!formData.agreeTerms) {
-      alert('Please agree to the Terms of Service');
+      setError('Please agree to the Terms of Service');
       return;
     }
-    setEmail(formData.email);
-    setCurrentPage('verify');
-  };
 
-  const handleVerifySubmit = () => {
-    if (verificationCode.some(digit => !digit)) {
-      alert('Please enter all 6 digits');
-      return;
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('http://localhost:3100/api/auth/pre-register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          age: formData.age ? parseInt(formData.age) : undefined,
+          bio: formData.bio || undefined,
+          photoUrl: formData.photoUrl || undefined
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
+      }
+
+      setEmail(formData.email);
+      setCurrentPage('verify');
+      alert('Registration successful! Please check your email for verification link.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-    console.log('Verification code:', verificationCode.join(''));
-    alert('Account verified! Redirecting to login...');
-    setCurrentPage('login');
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
-      rememberMe: false,
-      agreeTerms: false
-    });
-    setVerificationCode(['', '', '', '', '', '']);
   };
 
-  const handleLoginSubmit = () => {
+  const handleLoginSubmit = async () => {
+    setError('');
+    
     if (!formData.email || !formData.password) {
-      alert('Please fill in all fields');
+      setError('Please fill in all fields');
       return;
     }
-    console.log('Login submitted');
-    alert('Login successful!');
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('http://localhost:3100/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      // Store the token if your backend returns one
+      if (data.token) {
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('userDetails', JSON.stringify(data));
+      }
+
+      alert('Login successful!');
+      console.log('Login response:', data);
+      
+      // Here you would typically redirect to dashboard or home page
+      // window.location.href = '/dashboard';
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    try {
+      const response = await fetch('http://localhost:3100/api/auth/pre-register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: email,
+          password: formData.password,
+          age: formData.age ? parseInt(formData.age) : undefined,
+          bio: formData.bio || undefined,
+          photoUrl: formData.photoUrl || undefined
+        }),
+      });
+      if (response.ok) {
+        alert('Verification email resent!');
+      } else {
+        alert('Failed to resend email. Please try again.');
+      }
+    } catch (error) {
+      alert('Failed to resend email. Please try again.');
+    }
   };
 
   if (currentPage === 'login') {
@@ -104,6 +167,12 @@ export default function AuthPages() {
               <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back</h1>
               <p className="text-gray-600">Sign in to continue your journey</p>
             </div>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600 text-center">{error}</p>
+              </div>
+            )}
 
             <div className="space-y-6">
               <div>
@@ -162,15 +231,16 @@ export default function AuthPages() {
 
               <button
                 onClick={handleLoginSubmit}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transform hover:scale-105 transition duration-200 shadow-lg"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transform hover:scale-105 transition duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
-                Sign In
+                {isLoading ? 'Signing In...' : 'Sign In'}
               </button>
             </div>
 
             <div className="mt-6 text-center">
               <p className="text-gray-600">
-                Dont have an account?{' '}
+                Don't have an account?{' '}
                 <button
                   onClick={() => setCurrentPage('register')}
                   className="text-pink-600 hover:text-pink-700 font-semibold"
@@ -197,6 +267,12 @@ export default function AuthPages() {
               <h1 className="text-3xl font-bold text-gray-800 mb-2">Create Account</h1>
               <p className="text-gray-600">Join us and start your adventure</p>
             </div>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600 text-center">{error}</p>
+              </div>
+            )}
 
             <div className="space-y-5">
               <div>
@@ -252,7 +328,7 @@ export default function AuthPages() {
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Must be at least 8 characters</p>
+                <p className="text-xs text-gray-500 mt-1">Must be at least 6 characters</p>
               </div>
 
               <div>
@@ -278,6 +354,99 @@ export default function AuthPages() {
                 </div>
               </div>
 
+              <div className="pt-2 border-t border-gray-200">
+                <p className="text-sm font-medium text-gray-700 mb-3">Optional Information</p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                      Age
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.age}
+                      onChange={(e) => handleInputChange('age', e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition text-sm"
+                      placeholder="25"
+                      min="13"
+                      max="120"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                      Bio
+                    </label>
+                    <textarea
+                      value={formData.bio}
+                      onChange={(e) => handleInputChange('bio', e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition text-sm resize-none"
+                      placeholder="Tell us about yourself..."
+                      rows={2}
+                    />
+                  </div>
+
+                  {/* Profile Photo Upload */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                      Profile Photo
+                    </label>
+
+                    {/* File Input */}
+                     <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setError('');
+                          setIsLoading(true);
+                          try {
+                            const form = new FormData();
+                            form.append('image', file);
+                            const res = await fetch('http://localhost:3100/api/upload', {
+                              method: 'POST',
+                              body: form,
+                            });
+                            const data = await res.json();
+                            if (!res.ok) throw new Error(data.message || 'Upload failed');
+                            handleInputChange('photoUrl', data.data.secureUrl);
+                          } catch (err) {
+                            console.error('Upload failed:', err);
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : 'Image upload failed. Try again.'
+                            );
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }
+                      }}
+                      className="block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-md file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-pink-50 file:text-pink-700
+                        hover:file:bg-pink-100
+                        cursor-pointer"
+                    />
+
+                    {/* Preview */}
+                    {formData.photoUrl && formData.photoUrl.startsWith('http') && (
+                      <div className="mt-3">
+                        <p className="text-xs text-gray-500 mb-1">Preview:</p>
+                        <img
+                          src={formData.photoUrl}
+                          alt="Profile preview"
+                          className="w-24 h-24 rounded-full object-cover border-2 border-pink-200 shadow-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-start">
                 <input
                   type="checkbox"
@@ -299,9 +468,11 @@ export default function AuthPages() {
 
               <button
                 onClick={handleRegisterSubmit}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transform hover:scale-105 transition duration-200 shadow-lg"
+                disabled={isLoading}
+                type="button"
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transform hover:scale-105 transition duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
-                Create Account
+                {isLoading ? 'Creating Account...' : 'Create Account'}
               </button>
             </div>
 
@@ -339,60 +510,48 @@ export default function AuthPages() {
               <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Mail className="w-8 h-8 text-white" />
               </div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">Verify Your Email</h1>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">Check Your Email</h1>
               <p className="text-gray-600">
-                Weve sent a 6-digit code to
+                We've sent a verification link to
                 <br />
                 <span className="font-semibold text-gray-800">{email || 'your@email.com'}</span>
               </p>
             </div>
 
             <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3 text-center">
-                  Enter verification code
-                </label>
-                <div className="flex justify-center gap-2">
-                  {verificationCode.map((digit, index) => (
-                    <input
-                      key={index}
-                      id={`code-${index}`}
-                      type="text"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleVerificationInput(index, e.target.value)}
-                      onKeyDown={(e) => handleVerificationKeyDown(index, e)}
-                      className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none transition"
-                    />
-                  ))}
+              <div className="p-6 bg-gradient-to-br from-pink-50 to-purple-50 rounded-xl border-2 border-pink-200">
+                <div className="text-center space-y-3">
+                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-md">
+                    <Mail className="w-6 h-6 text-pink-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800">Verification Email Sent</h3>
+                  <p className="text-sm text-gray-600">
+                    Click the link in your email to verify your account and complete registration.
+                  </p>
                 </div>
               </div>
 
               <button
-                onClick={handleVerifySubmit}
+                onClick={() => setCurrentPage('login')}
                 className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transform hover:scale-105 transition duration-200 shadow-lg flex items-center justify-center gap-2"
               >
-                <Check className="w-5 h-5" />
-                Verify Email
+                Back to Login
               </button>
             </div>
 
             <div className="mt-6 text-center">
-              <p className="text-gray-600 text-sm mb-2">Didnt receive the code?</p>
+              <p className="text-gray-600 text-sm mb-2">Didn't receive the email?</p>
               <button 
-                onClick={() => {
-                  setVerificationCode(['', '', '', '', '', '']);
-                  alert('Verification code resent!');
-                }}
+                onClick={handleResendEmail}
                 className="text-pink-600 hover:text-pink-700 font-semibold text-sm"
               >
-                Resend Code
+                Resend Verification Email
               </button>
             </div>
 
             <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
               <p className="text-xs text-blue-800 text-center">
-                💡 Check your spam folder if you dont see the email in your inbox
+                💡 Check your spam folder if you don't see the email in your inbox
               </p>
             </div>
           </div>
