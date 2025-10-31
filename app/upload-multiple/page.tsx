@@ -51,7 +51,7 @@ export default function MultipleUploadPage() {
     });
 
     try {
-      const response = await fetch('http://localhost:3000/api/upload-multiple', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_PROD_API_URL}/api/upload-multiple`, {
         method: 'POST',
         body: formData,
       });

@@ -1,81 +1,100 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { Heart, X, MapPin, Briefcase, Info, Calendar } from 'lucide-react';
+import { Heart, X, MapPin, Briefcase, Info, Calendar, Loader2 } from 'lucide-react';
 
 interface Card {
-  id: number;
+  _id: string;
   name: string;
   age: number;
   photoUrl: string;
   bio: string;
   gender: string;
-  location?: string;
-  occupation?: string;
 }
-
-// Sample data matching your user schema
-const cardData: Card[] = [
-  {
-    id: 1,
-    name: 'Sarah Johnson',
-    age: 25,
-    photoUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&h=800&fit=crop',
-    bio: 'Love hiking, coffee, and meeting new people! Adventure seeker and coffee enthusiast ☕🌄',
-    gender: 'female',
-    location: 'New York, NY',
-    occupation: 'Photographer'
-  },
-  {
-    id: 2,
-    name: 'Emma Wilson',
-    age: 27,
-    photoUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&h=800&fit=crop',
-    bio: 'Foodie | Traveler | Dog lover. Always looking for the next great restaurant 🐕✈️🍕',
-    gender: 'female',
-    location: 'Los Angeles, CA',
-    occupation: 'Chef'
-  },
-  {
-    id: 3,
-    name: 'Michael Chen',
-    age: 28,
-    photoUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&h=800&fit=crop',
-    bio: 'Fitness enthusiast and music lover. Let\'s catch a concert together! 🎸💪',
-    gender: 'male',
-    location: 'Chicago, IL',
-    occupation: 'Personal Trainer'
-  },
-  {
-    id: 4,
-    name: 'Jessica Martinez',
-    age: 24,
-    photoUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&h=800&fit=crop',
-    bio: 'Beach lover and yoga instructor. Finding peace in every pose 🧘‍♀️🌊',
-    gender: 'female',
-    location: 'Miami, FL',
-    occupation: 'Yoga Instructor'
-  },
-  {
-    id: 5,
-    name: 'David Park',
-    age: 29,
-    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=800&fit=crop',
-    bio: 'Tech geek | Coffee addict | Cat dad. Building the future one line at a time 🐱💻',
-    gender: 'male',
-    location: 'Seattle, WA',
-    occupation: 'Software Engineer'
-  },
-];
 
 type DragEventType = React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>;
 
 export default function TinderCards() {
-  const [cards, setCards] = useState<Card[]>(cardData);
+  const [cards, setCards] = useState<Card[]>([]);
+  const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<'love' | 'nope' | null>(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [matchNotification, setMatchNotification] = useState<string | null>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const API_URL = `${process.env.NEXT_PUBLIC_PROD_API_URL}/api`;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+
+  // Fetch suggestions on mount
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    fetchSuggestions();
+  }, [token]);
+
+  const fetchSuggestions = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/auth/suggestions`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setCards(data.suggestions || []);
+      } else {
+        console.error('Failed to fetch suggestions:', data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLike = async (userId: string) => {
+    try {
+      const response = await fetch(`${API_URL}/auth/like`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ likedUserId: userId })
+      });
+
+      const data = await response.json();
+
+      if (data.isMatch) {
+        // Show match notification
+        setMatchNotification(cards[0]?.name || 'Someone');
+        setTimeout(() => setMatchNotification(null), 3000);
+      }
+    } catch (error) {
+      console.error('Error liking user:', error);
+    }
+  };
+
+  const handlePass = async (userId: string) => {
+    try {
+      await fetch(`${API_URL}/auth/pass`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ passedUserId: userId })
+      });
+    } catch (error) {
+      console.error('Error passing user:', error);
+    }
+  };
 
   const handleDragStart = (e: DragEventType) => {
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -113,7 +132,19 @@ export default function TinderCards() {
     }
   };
 
-  const removeCard = (isLove: boolean) => {
+  const removeCard = async (isLove: boolean) => {
+    if (cards.length === 0) return;
+
+    const currentCard = cards[0];
+
+    // Call API
+    if (isLove) {
+      await handleLike(currentCard._id);
+    } else {
+      await handlePass(currentCard._id);
+    }
+
+    // Remove card from UI
     setCards((prev) => prev.slice(1));
     setDragOffset({ x: 0, y: 0 });
     setStatus(null);
@@ -160,8 +191,55 @@ export default function TinderCards() {
     };
   };
 
+  if (loading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-12 h-12 text-pink-500 animate-spin" />
+          <p className="text-gray-600 font-medium">Finding matches for you...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!token) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-center">
+          <Heart className="w-16 h-16 text-pink-500 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-gray-800 mb-2">Please Login</h3>
+          <p className="text-gray-600">You need to be logged in to see matches</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full overflow-hidden flex flex-col relative">
+      {/* Match Notification */}
+      {matchNotification && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl p-8 max-w-md mx-4 text-center shadow-2xl animate-in zoom-in">
+            <div className="w-20 h-20 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Heart className="w-10 h-10 text-white" fill="white" />
+            </div>
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">It's a Match!</h2>
+            <p className="text-gray-600 text-lg mb-6">
+              You and <span className="font-semibold text-pink-600">{matchNotification}</span> liked each other
+            </p>
+            <button
+              onClick={() => {
+                setMatchNotification(null);
+                window.location.href = '/matches';
+              }}
+              className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transition"
+            >
+              Send a Message
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Status indicators */}
       <div className="absolute top-1/2 -mt-24 w-full text-center pointer-events-none z-20">
         <div className="flex justify-center">
@@ -186,7 +264,7 @@ export default function TinderCards() {
         <div className="relative w-full max-w-sm h-[600px] md:h-[650px]">
           {cards.map((card, index) => (
             <div
-              key={card.id}
+              key={card._id}
               ref={(el) => {
                 cardRefs.current[index] = el;
               }}              
@@ -200,7 +278,7 @@ export default function TinderCards() {
               {/* Card Image */}
               <div className="relative h-3/4">
                 <img
-                  src={card.photoUrl}
+                  src={card.photoUrl || `https://ui-avatars.com/api/?name=${card.name}&size=600&background=random`}
                   alt={card.name}
                   className="w-full h-full object-cover pointer-events-none select-none"
                   draggable={false}
@@ -215,20 +293,6 @@ export default function TinderCards() {
                   </h2>
                   
                   <div className="space-y-2">
-                    {card.location && (
-                      <div className="flex items-center gap-2 text-sm pointer-events-none drop-shadow">
-                        <MapPin className="w-4 h-4 flex-shrink-0" />
-                        <span>{card.location}</span>
-                      </div>
-                    )}
-                    
-                    {card.occupation && (
-                      <div className="flex items-center gap-2 text-sm pointer-events-none drop-shadow">
-                        <Briefcase className="w-4 h-4 flex-shrink-0" />
-                        <span>{card.occupation}</span>
-                      </div>
-                    )}
-                    
                     <div className="flex items-center gap-2 text-sm pointer-events-none drop-shadow">
                       <Calendar className="w-4 h-4 flex-shrink-0" />
                       <span className="capitalize">{card.gender}</span>
@@ -245,7 +309,7 @@ export default function TinderCards() {
               {/* Card Bio */}
               <div className="h-1/4 p-6 flex items-center bg-gradient-to-b from-gray-50 to-white">
                 <p className="text-gray-700 text-base pointer-events-none leading-relaxed line-clamp-3">
-                  {card.bio}
+                  {card.bio || 'No bio available'}
                 </p>
               </div>
             </div>
@@ -257,7 +321,13 @@ export default function TinderCards() {
                 <Heart className="w-12 h-12 text-white" fill="white" />
               </div>
               <p className="text-2xl font-bold text-gray-800 mb-2">No more profiles</p>
-              <p className="text-gray-500 text-center px-8">Check back later for new matches!</p>
+              <p className="text-gray-500 text-center px-8 mb-6">Check back later for new matches!</p>
+              <button
+                onClick={fetchSuggestions}
+                className="px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transition"
+              >
+                Refresh
+              </button>
             </div>
           )}
         </div>

@@ -1,15 +1,55 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Heart, MessageCircle, User } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import { Heart, MessageCircle, User, LogOut } from "lucide-react";
 
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const [user, setUser] = useState<{ name?: string; photoUrl?: string }>({});
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isActive = (path: string) => pathname === path;
 
+  // Fetch user details from localStorage
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem("userDetails");
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        setUser({
+          name: parsed.name || "User",
+          photoUrl: parsed.photoUrl || "",
+        });
+      }
+    } catch (error) {
+      console.error("Error parsing userDetails from localStorage", error);
+    }
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userDetails");
+    setDropdownOpen(false);
+    router.push("/auth"); // redirect to login page
+  };
+
   return (
-    <header className="bg-white shadow-sm border-b border-gray-100">
+    <header className="bg-white shadow-sm border-b border-gray-100 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -68,15 +108,44 @@ export default function Header() {
             </Link>
           </nav>
 
-          {/* User Info */}
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:block text-right">
-              <p className="text-sm font-semibold text-gray-800">John Doe</p>
-              <p className="text-xs text-gray-500">Find your match</p>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center shadow-md">
-              <User className="w-5 h-5 text-white" />
-            </div>
+          {/* User Info + Dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setDropdownOpen((prev) => !prev)}
+              className="flex items-center gap-3 focus:outline-none"
+            >
+              <div className="hidden sm:block text-right">
+                <p className="text-sm font-semibold text-gray-800">
+                  {user.name ? user.name.charAt(0).toUpperCase() + user.name.slice(1) : "User"}
+                </p>
+                <p className="text-xs text-gray-500">Find your match</p>
+              </div>
+              <div className="w-10 h-10 rounded-full overflow-hidden shadow-md border-2 border-pink-400 cursor-pointer">
+                {user.photoUrl ? (
+                  <img
+                    src={user.photoUrl}
+                    alt="User Avatar"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center">
+                    <User className="w-5 h-5 text-white" />
+                  </div>
+                )}
+              </div>
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <LogOut className="w-4 h-4 mr-2 text-pink-500" />
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

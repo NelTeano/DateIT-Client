@@ -7,11 +7,18 @@ import { Send, ArrowLeft, MoreVertical } from 'lucide-react';
 interface Message {
   _id: string;
   matchId: string;
-  sender: { _id: string; name: string };
-  receiver: { _id: string; name: string };
+  sender: { _id: string; name: string; profilePicture?: string };
+  receiver: { _id: string; name: string; profilePicture?: string };
   content: string;
   read: boolean;
   createdAt: string;
+}
+
+interface Match {
+  _id: string;
+  user1: { _id: string; name: string; profilePicture?: string };
+  user2: { _id: string; name: string; profilePicture?: string };
+  status: string;
 }
 
 export default function ChatPage() {
@@ -22,9 +29,11 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [markedAsRead, setMarkedAsRead] = useState(false);
+  const [otherUserId, setOtherUserId] = useState<string | null>(null);
+  const [otherUser, setOtherUser] = useState<{ name: string; profilePicture?: string } | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
 
   // Get token and current user info from localStorage
   const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
@@ -41,64 +50,107 @@ export default function ChatPage() {
     return null;
   })() : null;
 
-  // useEffect(() => {
-  //   if (!token) {
-  //     alert('You must be logged in to access the chat.');
-  //     router.push('/auth');
-  //   }
-  // }, [token, router]);
+  // Track if user is at the bottom of the chat
+  const handleScroll = (e: any) => {
+    const bottom = e.target.scrollHeight - e.target.scrollTop - e.target.clientHeight < 100;
+    isAtBottomRef.current = bottom;
+  };
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom when new messages arrive (only if user was already at bottom)
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isAtBottomRef.current) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
-  // Fetch messages
+  // Fetch messages function
+  const fetchMessages = async (isInitialLoad = false) => {
+    if (!matchId || !token) return;
+
+    try {
+      if (isInitialLoad) {
+        setLoading(true);
+      }
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_PROD_API_URL}/api/chat/${matchId}?page=1&limit=50`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setMessages(data.messages);
+        
+        // Get other user info from match data
+        if (data.match && currentUserId) {
+          const match: Match = data.match;
+          const isUser1 = match.user1._id === currentUserId;
+          const otherUserData = isUser1 ? match.user2 : match.user1;
+          
+          setOtherUserId(otherUserData._id);
+          setOtherUser({
+            name: otherUserData.name,
+            profilePicture: otherUserData.profilePicture
+          });
+        }
+        // Fallback: Get from first message if match data not available
+        else if (data.messages.length > 0 && currentUserId) {
+          const firstMsg = data.messages[0];
+          const isMessageFromMe = firstMsg.sender._id === currentUserId;
+          const otherUserData = isMessageFromMe ? firstMsg.receiver : firstMsg.sender;
+          
+          setOtherUserId(otherUserData._id);
+          setOtherUser({
+            name: otherUserData.name,
+            profilePicture: otherUserData.profilePicture
+          });
+        }
+      } else {
+        console.error(data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    } finally {
+      if (isInitialLoad) {
+        setLoading(false);
+      }
+    }
+  };
+
+  // Initial fetch
+  useEffect(() => {
+    fetchMessages(true);
+  }, [matchId, token, currentUserId]);
+
+  // Auto-refresh every 7 seconds
   useEffect(() => {
     if (!matchId || !token) return;
 
-    const fetchMessages = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`http://localhost:3100/api/chat/${matchId}?page=1&limit=50`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
+    const intervalId = setInterval(() => {
+      fetchMessages(false);
+    }, 7000); // 7 seconds
 
-        if (data.success) {
-          setMessages(data.messages);
-        } else {
-          console.error(data.message);
-        }
-      } catch (error) {
-        console.error('Error fetching messages:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMessages();
+    // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
   }, [matchId, token]);
 
   // Mark messages as read when user views the chat
   useEffect(() => {
-    if (!matchId || !token || !currentUserId || messages.length === 0 || markedAsRead) return;
+    if (!matchId || !token || !currentUserId || messages.length === 0) return;
 
-    // Check if there are any unread messages from the other user
-    const hasUnreadMessages = messages.some(
+    const hasUnreadMessagesForMe = messages.some(
       msg => msg.receiver._id === currentUserId && !msg.read
     );
 
-    if (hasUnreadMessages) {
+    if (hasUnreadMessagesForMe) {
       markMessagesAsRead();
     }
-  }, [messages, matchId, token, currentUserId, markedAsRead]);
+  }, [messages, matchId, token, currentUserId]);
 
   const markMessagesAsRead = async () => {
     if (!matchId || !token) return;
 
     try {
-      const res = await fetch(`http://localhost:3100/api/chat/${matchId}/read`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_PROD_API_URL}/api/chat/${matchId}/read`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -106,13 +158,11 @@ export default function ChatPage() {
       const data = await res.json();
 
       if (data.success) {
-        console.log('Messages marked as read:', data);
-        setMarkedAsRead(true);
-        
-        // Update local state to reflect read status
         setMessages(prevMessages =>
           prevMessages.map(msg =>
-            msg.receiver._id === currentUserId ? { ...msg, read: true } : msg
+            msg.receiver._id === currentUserId && !msg.read
+              ? { ...msg, read: true }
+              : msg
           )
         );
       }
@@ -123,11 +173,13 @@ export default function ChatPage() {
 
   // Send a message
   const handleSend = async () => {
-    if (!newMessage.trim() || !matchId || !token) return;
+    if (!newMessage.trim() || !matchId || !token || !otherUserId) {
+      return;
+    }
 
     try {
       setSending(true);
-      const res = await fetch('http://localhost:3100/api/chat/send', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_PROD_API_URL}/api/chat/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -136,30 +188,34 @@ export default function ChatPage() {
         body: JSON.stringify({
           matchId,
           content: newMessage,
-          receiverId: '6900c247a143cce32e5ecd30',
+          receiverId: otherUserId,
         }),
       });
 
       const data = await res.json();
+
       if (data.success) {
         setMessages((prev) => [...prev, data.message]);
         setNewMessage('');
+        // Scroll to bottom after sending
+        setTimeout(() => {
+          chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
       } else {
-        console.error(data.message);
+        console.error('Send failed:', data.message);
+        alert(`Failed to send message: ${data.message}`);
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      alert('Error sending message. Please try again.');
     } finally {
       setSending(false);
     }
   };
 
   // Get other user's name for header
-  const otherUserName = messages.length > 0 
-    ? messages.find(m => m.sender._id !== currentUserId)?.sender.name || 
-      messages.find(m => m.receiver._id !== currentUserId)?.receiver.name || 
-      'Chat'
-    : 'Chat';
+  const otherUserName = otherUser?.name || 'Chat';
+  const otherUserInitial = otherUserName.charAt(0).toUpperCase();
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 via-white to-purple-50">
@@ -175,9 +231,17 @@ export default function ChatPage() {
               <ArrowLeft size={20} className="text-gray-700" />
             </button>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white font-semibold shadow-md">
-                {otherUserName.charAt(0).toUpperCase()}
-              </div>
+              {otherUser?.profilePicture ? (
+                <img
+                  src={otherUser.profilePicture}
+                  alt={otherUserName}
+                  className="w-10 h-10 rounded-full object-cover shadow-md"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white font-semibold shadow-md">
+                  {otherUserInitial}
+                </div>
+              )}
               <div>
                 <h1 className="font-semibold text-gray-900">{otherUserName}</h1>
                 <p className="text-xs text-gray-500">Active now</p>
@@ -194,7 +258,10 @@ export default function ChatPage() {
       </header>
 
       {/* Messages Container */}
-      <main className="flex-1 overflow-y-auto p-4 max-w-4xl w-full mx-auto">
+      <main 
+        className="flex-1 overflow-y-auto p-4 max-w-4xl w-full mx-auto"
+        onScroll={handleScroll}
+      >
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <div className="w-12 h-12 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin"></div>
@@ -207,7 +274,7 @@ export default function ChatPage() {
             </div>
             <div className="text-center">
               <p className="text-gray-600 font-medium text-lg">No messages yet</p>
-              <p className="text-gray-400 text-sm mt-1">Start the conversation!</p>
+              <p className="text-gray-400 text-sm mt-1">Start the conversation with {otherUserName}!</p>
             </div>
           </div>
         ) : (
@@ -331,13 +398,14 @@ export default function ChatPage() {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+              disabled={!otherUserId || sending}
             />
           </div>
           <button
             onClick={handleSend}
-            disabled={sending || !newMessage.trim()}
+            disabled={sending || !newMessage.trim() || !otherUserId}
             className={`p-3 rounded-full transition-all transform active:scale-95 shadow-md ${
-              newMessage.trim() && !sending
+              newMessage.trim() && !sending && otherUserId
                 ? 'bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}

@@ -46,20 +46,20 @@ export default function AuthPages() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3100/api/auth/pre-register', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_PROD_API_URL}/api/auth/pre-register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
+          name: formData.name.toLowerCase(),
+          email: formData.email.toLowerCase(),
           password: formData.password,
           age: formData.age ? parseInt(formData.age) : undefined,
           bio: formData.bio || undefined,
           photoUrl: formData.photoUrl || undefined,
-          gender: formData.gender,
-          findGender: formData.findGender
+          gender: formData.gender.toLowerCase(),
+          findGender: formData.findGender.toLowerCase()
         }),
       });
 
@@ -69,9 +69,9 @@ export default function AuthPages() {
         throw new Error(data.message || 'Registration failed');
       }
 
+
       setEmail(formData.email);
       setCurrentPage('verify');
-      alert('Registration successful! Please check your email for verification link.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     } finally {
@@ -109,13 +109,13 @@ export default function AuthPages() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3100/api/auth/login', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_PROD_API_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: formData.email,
+          email: formData.email.toLowerCase(),
           password: formData.password,
         }),
       });
@@ -126,15 +126,13 @@ export default function AuthPages() {
         throw new Error(data.message || 'Login failed');
       }
 
-      // Store the token if your backend returns one
       if (data.token) {
-        // Note: In production, use a more secure storage method
-        const tempStorage = { authToken: data.token, userDetails: JSON.stringify(data) };
-        console.log('Login successful, token stored:', tempStorage);
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('userDetails', JSON.stringify(data));
       }
 
-      alert('Login successful!');
-      console.log('Login response:', data);
+      window.location.href = '/match';
+
       
       // Here you would typically redirect to dashboard or home page
       // window.location.href = '/dashboard';
@@ -147,7 +145,7 @@ export default function AuthPages() {
 
   const handleResendEmail = async () => {
     try {
-      const response = await fetch('http://localhost:3100/api/auth/pre-register', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_PROD_API_URL}/api/auth/pre-register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -512,7 +510,7 @@ export default function AuthPages() {
                       try {
                         const form = new FormData();
                         form.append('image', file);
-                        const res = await fetch('http://localhost:3100/api/upload', {
+                        const res = await fetch(`${process.env.NEXT_PUBLIC_PROD_API_URL}/api/upload`, {
                           method: 'POST',
                           body: form,
                         });

@@ -39,7 +39,7 @@ export default function UploadPage() {
     formData.append('image', selectedFile);
 
     try {
-      const response = await fetch('http://localhost:3000/api/upload', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_PROD_API_URL}/api/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -69,7 +69,7 @@ export default function UploadPage() {
 
     try {
       const response = await fetch(
-        `http://localhost:3000/api/delete/${uploadedImage.publicId}`,
+        `${process.env.NEXT_PUBLIC_PROD_API_URL}/api/delete/${uploadedImage.publicId}`,
         { method: 'DELETE', credentials: 'include' }
       );
 
