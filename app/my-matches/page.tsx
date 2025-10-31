@@ -75,10 +75,16 @@ export default function MyMatches() {
       }
 
       if (data.success) {
-        setMatches(data.matches || []);
-        if (data.matches && data.matches.length > 0) {
-          data.matches.forEach(match => {
-            fetchUnreadCount(match._id);
+        // INCLUDE ALL MATCHES (active and ended)
+        const allMatches = data.matches || [];
+        setMatches(allMatches);
+        
+        // Only fetch unread counts for active matches
+        if (allMatches && allMatches.length > 0) {
+          allMatches.forEach(match => {
+            if (match.status === 'active') {
+              fetchUnreadCount(match._id);
+            }
           });
         }
       }
@@ -89,7 +95,6 @@ export default function MyMatches() {
       setLoading(false);
     }
   };
-
   const fetchPendingRequests = async () => {
     try {
       const response = await fetch(`${API_URL}/matches/pending-requests`, {
@@ -421,71 +426,107 @@ export default function MyMatches() {
               </div>
             ) : (
               <div className="grid gap-4">
-                {filteredMatches.map((match) => {
-                  const otherUser = getOtherUser(match);
-                  if (!otherUser) return null;
+                 {filteredMatches.map((match) => {
+                    const otherUser = getOtherUser(match);
+                    if (!otherUser) return null;
 
-                  return (
-                    <div
-                      key={match._id}
-                      className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div 
-                          className="relative cursor-pointer"
-                          onClick={() => handleOpenChat(match._id)}
-                        >
-                          <div className="w-16 h-16 bg-gradient-to-br from-pink-400 to-purple-500 rounded-full flex items-center justify-center text-white text-xl font-bold">
-                            {otherUser.name.charAt(0).toUpperCase()}
+                    const isEnded = match.status === 'ended';
+                    const endedByMe = match.endedBy === currentUserId;
+
+                    return (
+                      <div
+                        key={match._id}
+                        className={`bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 ${
+                          isEnded ? 'opacity-60 border-2 border-red-200' : ''
+                        }`}
+                      >
+                        {/* Ended Badge */}
+                        {isEnded && (
+                          <div className="mb-3 flex items-center justify-center">
+                            <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-2">
+                              <X className="w-4 h-4" />
+                              Match Ended {endedByMe ? '(by you)' : `(by ${otherUser.name})`}
+                            </div>
                           </div>
-                          {unreadCounts[match._id] > 0 && (
-                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                              <span className="text-xs text-white font-bold">
-                                {unreadCounts[match._id] > 9 ? '9+' : unreadCounts[match._id]}
+                        )}
+
+                        <div className="flex items-center gap-4">
+                          <div 
+                            className={`relative ${!isEnded ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                            onClick={() => !isEnded && handleOpenChat(match._id)}
+                          >
+                            <div className="w-16 h-16 bg-gradient-to-br from-pink-400 to-purple-500 rounded-full flex items-center justify-center text-white text-xl font-bold">
+                              {otherUser.name.charAt(0).toUpperCase()}
+                            </div>
+                            {!isEnded && unreadCounts[match._id] > 0 && (
+                              <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                                <span className="text-xs text-white font-bold">
+                                  {unreadCounts[match._id] > 9 ? '9+' : unreadCounts[match._id]}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div 
+                            className={`flex-1 min-w-0 ${!isEnded ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                            onClick={() => !isEnded && handleOpenChat(match._id)}
+                          >
+                            <h3 className="text-lg font-semibold text-gray-800 truncate">
+                              {otherUser.name}
+                            </h3>
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <Calendar className="w-4 h-4" />
+                              <span>
+                                {isEnded 
+                                  ? `Ended ${formatDate(match.endedAt || match.updatedAt)}`
+                                  : `Matched ${formatDate(match.createdAt)}`
+                                }
                               </span>
                             </div>
-                          )}
-                        </div>
+                          </div>
 
-                        <div 
-                          className="flex-1 min-w-0 cursor-pointer"
-                          onClick={() => handleOpenChat(match._id)}
-                        >
-                          <h3 className="text-lg font-semibold text-gray-800 truncate">
-                            {otherUser.name}
-                          </h3>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Calendar className="w-4 h-4" />
-                            <span>Matched {formatDate(match.createdAt)}</span>
+                          <div className="flex items-center gap-2">
+                            {!isEnded && (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnmatchClick(match);
+                                  }}
+                                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                                  title="Unmatch"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenChat(match._id);
+                                  }}
+                                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition"
+                                >
+                                  <MessageCircle className="w-5 h-5" />
+                                  <span className="hidden sm:inline">Chat</span>
+                                </button>
+                              </>
+                            )}
+                            {isEnded && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenChat(match._id);
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition"
+                              >
+                                <MessageCircle className="w-5 h-5" />
+                                <span className="hidden sm:inline">View Chat</span>
+                              </button>
+                            )}
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUnmatchClick(match);
-                            }}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
-                            title="Unmatch"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenChat(match._id);
-                            }}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition"
-                          >
-                            <MessageCircle className="w-5 h-5" />
-                            <span className="hidden sm:inline">Chat</span>
-                          </button>
-                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             )}
           </div>

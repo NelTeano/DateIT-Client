@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Send, ArrowLeft, MoreVertical } from 'lucide-react';
+import { Send, ArrowLeft, MoreVertical, X} from 'lucide-react';
 
 interface Message {
   _id: string;
@@ -44,6 +44,8 @@ function ChatPageContent() {
   const [sending, setSending] = useState(false);
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
   const [otherUser, setOtherUser] = useState<{ name: string; profilePicture?: string } | null>(null);
+  const [matchStatus, setMatchStatus] = useState<string>('active');
+  const [endedByUserId, setEndedByUserId] = useState<string | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
@@ -94,8 +96,15 @@ function ChatPageContent() {
         setMessages(data.messages);
         
         // Get other user info from match data
-        if (data.match && currentUserId) {
-          const match: Match = data.match;
+          if (data.match && currentUserId) {
+            const match: Match = data.match;
+
+            // SET MATCH STATUS AND ENDED BY
+          setMatchStatus(match.status);
+          if (match.status === 'ended') {
+            setEndedByUserId((match as any).endedBy || null);
+          }
+
           const isUser1 = match.user1._id === currentUserId;
           const otherUserData = isUser1 ? match.user2 : match.user1;
           
@@ -221,6 +230,16 @@ function ChatPageContent() {
       alert('Error sending message. Please try again.');
     } finally {
       setSending(false);
+    }
+  };
+
+  const getEndedByMessage = () => {
+    if (!endedByUserId || !currentUserId) return 'This match has ended';
+    
+    if (endedByUserId === currentUserId) {
+      return 'You ended this match';
+    } else {
+      return `${otherUserName} ended this match`;
     }
   };
 
@@ -399,37 +418,57 @@ function ChatPageContent() {
       </main>
 
       {/* Enhanced Input Footer */}
-      <footer className="bg-white border-t border-pink-100 shadow-lg">
-        <div className="flex items-end gap-2 p-3 max-w-4xl mx-auto">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              className="w-full border border-pink-200 rounded-3xl px-5 py-3 pr-4 outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-100 transition-all bg-pink-50 focus:bg-white"
-              placeholder="Type a message..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-              disabled={!otherUserId || sending}
-            />
-          </div>
-          <button
-            onClick={handleSend}
-            disabled={sending || !newMessage.trim() || !otherUserId}
-            className={`p-3 rounded-full transition-all transform active:scale-95 shadow-md ${
-              newMessage.trim() && !sending && otherUserId
-                ? 'bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-            aria-label="Send message"
-          >
-            {sending ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-              <Send size={20} />
-            )}
-          </button>
+      {matchStatus === 'ended' ? (
+  <footer className="bg-white border-t border-red-100 shadow-lg">
+    <div className="flex items-center justify-center p-6 max-w-4xl mx-auto">
+      <div className="text-center">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <X size={32} className="text-red-500" />
         </div>
-      </footer>
+        <p className="text-red-600 font-semibold text-lg">{getEndedByMessage()}</p>
+        <p className="text-gray-500 text-sm mt-1">You can no longer send messages</p>
+        <button
+          onClick={() => router.push('/my-matches')}
+          className="mt-4 px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition"
+        >
+          Back to Matches
+        </button>
+      </div>
+    </div>
+  </footer>
+) : (
+  <footer className="bg-white border-t border-pink-100 shadow-lg">
+    <div className="flex items-end gap-2 p-3 max-w-4xl mx-auto">
+      <div className="flex-1 relative">
+        <input
+          type="text"
+          className="w-full border border-pink-200 rounded-3xl px-5 py-3 pr-4 outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-100 transition-all bg-pink-50 focus:bg-white"
+          placeholder="Type a message..."
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+          disabled={!otherUserId || sending}
+        />
+      </div>
+      <button
+        onClick={handleSend}
+        disabled={sending || !newMessage.trim() || !otherUserId}
+        className={`p-3 rounded-full transition-all transform active:scale-95 shadow-md ${
+          newMessage.trim() && !sending && otherUserId
+            ? 'bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white'
+            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+        }`}
+        aria-label="Send message"
+      >
+        {sending ? (
+          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+        ) : (
+          <Send size={20} />
+        )}
+      </button>
+    </div>
+  </footer>
+)}
     </div>
   );
 }

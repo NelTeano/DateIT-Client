@@ -240,9 +240,6 @@ export default function AuthPages() {
                   />
                   <span className="ml-2 text-sm text-gray-600">Remember me</span>
                 </label>
-                <button className="text-sm text-pink-600 hover:text-pink-700 font-medium">
-                  Forgot password?
-                </button>
               </div>
 
               <button
