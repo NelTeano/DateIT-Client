@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, Heart } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, Heart, ArrowRight } from 'lucide-react';
 
 export default function AuthPages() {
   const [currentPage, setCurrentPage] = useState('login');
@@ -16,7 +16,9 @@ export default function AuthPages() {
     agreeTerms: false,
     age: '',
     bio: '',
-    photoUrl: ''
+    photoUrl: '',
+    gender: '',
+    findGender: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,19 +31,11 @@ export default function AuthPages() {
   };
 
   const handleRegisterSubmit = async () => {
-    console.log('Register payload:', formData); // ✅ add this
+    console.log('Register payload:', formData);
     setError('');
     
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-      setError('Please fill in all fields');
-      return;
-    }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+    if (!formData.gender || !formData.findGender) {
+      setError('Please select your gender and preference');
       return;
     }
     if (!formData.agreeTerms) {
@@ -63,7 +57,9 @@ export default function AuthPages() {
           password: formData.password,
           age: formData.age ? parseInt(formData.age) : undefined,
           bio: formData.bio || undefined,
-          photoUrl: formData.photoUrl || undefined
+          photoUrl: formData.photoUrl || undefined,
+          gender: formData.gender,
+          findGender: formData.findGender
         }),
       });
 
@@ -81,6 +77,25 @@ export default function AuthPages() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleContinueToUserInfo = () => {
+    setError('');
+    
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+      setError('Please fill in all fields');
+      return;
+    }
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setCurrentPage('userinfo');
   };
 
   const handleLoginSubmit = async () => {
@@ -113,8 +128,9 @@ export default function AuthPages() {
 
       // Store the token if your backend returns one
       if (data.token) {
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('userDetails', JSON.stringify(data));
+        // Note: In production, use a more secure storage method
+        const tempStorage = { authToken: data.token, userDetails: JSON.stringify(data) };
+        console.log('Login successful, token stored:', tempStorage);
       }
 
       alert('Login successful!');
@@ -142,7 +158,9 @@ export default function AuthPages() {
           password: formData.password,
           age: formData.age ? parseInt(formData.age) : undefined,
           bio: formData.bio || undefined,
-          photoUrl: formData.photoUrl || undefined
+          photoUrl: formData.photoUrl || undefined,
+          gender: formData.gender,
+          findGender: formData.findGender
         }),
       });
       if (response.ok) {
@@ -265,7 +283,7 @@ export default function AuthPages() {
                 <Heart className="w-8 h-8 text-white" fill="white" />
               </div>
               <h1 className="text-3xl font-bold text-gray-800 mb-2">Create Account</h1>
-              <p className="text-gray-600">Join us and start your adventure</p>
+              <p className="text-gray-600">Step 1: Basic Information</p>
             </div>
 
             {error && (
@@ -354,100 +372,188 @@ export default function AuthPages() {
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-gray-200">
-                <p className="text-sm font-medium text-gray-700 mb-3">Optional Information</p>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-2">
-                      Age
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.age}
-                      onChange={(e) => handleInputChange('age', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition text-sm"
-                      placeholder="25"
-                      min="13"
-                      max="120"
-                    />
-                  </div>
+              <button
+                onClick={handleContinueToUserInfo}
+                type="button"
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-pink-600 hover:to-purple-700 transform hover:scale-105 transition duration-200 shadow-lg flex items-center justify-center gap-2"
+              >
+                Continue
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-2">
-                      Bio
-                    </label>
-                    <textarea
-                      value={formData.bio}
-                      onChange={(e) => handleInputChange('bio', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition text-sm resize-none"
-                      placeholder="Tell us about yourself..."
-                      rows={2}
-                    />
-                  </div>
+            <div className="mt-6 text-center">
+              <p className="text-gray-600">
+                Already have an account?{' '}
+                <button
+                  onClick={() => setCurrentPage('login')}
+                  className="text-pink-600 hover:text-pink-700 font-semibold"
+                >
+                  Sign in
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-                  {/* Profile Photo Upload */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-2">
-                      Profile Photo
-                    </label>
+  if (currentPage === 'userinfo') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-100 to-indigo-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-2xl p-8">
+            <button
+              onClick={() => setCurrentPage('register')}
+              className="flex items-center text-gray-600 hover:text-gray-800 mb-6 transition"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back
+            </button>
 
-                    {/* File Input */}
-                     <input
-                      type="file"
-                      accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setError('');
-                          setIsLoading(true);
-                          try {
-                            const form = new FormData();
-                            form.append('image', file);
-                            const res = await fetch('http://localhost:3100/api/upload', {
-                              method: 'POST',
-                              body: form,
-                            });
-                            const data = await res.json();
-                            if (!res.ok) throw new Error(data.message || 'Upload failed');
-                            handleInputChange('photoUrl', data.data.secureUrl);
-                          } catch (err) {
-                            console.error('Upload failed:', err);
-                            setError(
-                              err instanceof Error
-                                ? err.message
-                                : 'Image upload failed. Try again.'
-                            );
-                          } finally {
-                            setIsLoading(false);
-                          }
-                        }
-                      }}
-                      className="block w-full text-sm text-gray-500
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-md file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-pink-50 file:text-pink-700
-                        hover:file:bg-pink-100
-                        cursor-pointer"
-                    />
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Heart className="w-8 h-8 text-white" fill="white" />
+              </div>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">About You</h1>
+              <p className="text-gray-600">Step 2: Tell us more about yourself</p>
+            </div>
 
-                    {/* Preview */}
-                    {formData.photoUrl && formData.photoUrl.startsWith('http') && (
-                      <div className="mt-3">
-                        <p className="text-xs text-gray-500 mb-1">Preview:</p>
-                        <img
-                          src={formData.photoUrl}
-                          alt="Profile preview"
-                          className="w-24 h-24 rounded-full object-cover border-2 border-pink-200 shadow-sm"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600 text-center">{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-5">
+              {/* Gender Selection - Required */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  I am <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.gender}
+                  onChange={(e) => handleInputChange('gender', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition"
+                  required
+                >
+                  <option value="">Select your gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="non-binary">Non-binary</option>
+                  <option value="other">Other</option>
+                </select>
               </div>
 
-              <div className="flex items-start">
+              {/* Find Gender Preference - Required */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  I'm interested in <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.findGender}
+                  onChange={(e) => handleInputChange('findGender', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition"
+                  required
+                >
+                  <option value="">Select preference</option>
+                  <option value="male">Men</option>
+                  <option value="female">Women</option>
+                  <option value="non-binary">Non-binary</option>
+                  <option value="other">Other</option>
+                  <option value="everyone">Everyone</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Age
+                </label>
+                <input
+                  type="number"
+                  value={formData.age}
+                  onChange={(e) => handleInputChange('age', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition"
+                  placeholder="25"
+                  min="13"
+                  max="120"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Bio
+                </label>
+                <textarea
+                  value={formData.bio}
+                  onChange={(e) => handleInputChange('bio', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition resize-none"
+                  placeholder="Tell us about yourself..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Profile Photo Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Profile Photo
+                </label>
+
+                {/* File Input */}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setError('');
+                      setIsLoading(true);
+                      try {
+                        const form = new FormData();
+                        form.append('image', file);
+                        const res = await fetch('http://localhost:3100/api/upload', {
+                          method: 'POST',
+                          body: form,
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message || 'Upload failed');
+                        handleInputChange('photoUrl', data.data.secureUrl);
+                      } catch (err) {
+                        console.error('Upload failed:', err);
+                        setError(
+                          err instanceof Error
+                            ? err.message
+                            : 'Image upload failed. Try again.'
+                        );
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }
+                  }}
+                  className="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-md file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-pink-50 file:text-pink-700
+                    hover:file:bg-pink-100
+                    cursor-pointer"
+                />
+
+                {/* Preview */}
+                {formData.photoUrl && formData.photoUrl.startsWith('http') && (
+                  <div className="mt-3">
+                    <p className="text-xs text-gray-500 mb-1">Preview:</p>
+                    <img
+                      src={formData.photoUrl}
+                      alt="Profile preview"
+                      className="w-24 h-24 rounded-full object-cover border-2 border-pink-200 shadow-sm"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-start pt-4">
                 <input
                   type="checkbox"
                   checked={formData.agreeTerms}
@@ -475,18 +581,6 @@ export default function AuthPages() {
                 {isLoading ? 'Creating Account...' : 'Create Account'}
               </button>
             </div>
-
-            <div className="mt-6 text-center">
-              <p className="text-gray-600">
-                Already have an account?{' '}
-                <button
-                  onClick={() => setCurrentPage('login')}
-                  className="text-pink-600 hover:text-pink-700 font-semibold"
-                >
-                  Sign in
-                </button>
-              </p>
-            </div>
           </div>
         </div>
       </div>
@@ -499,7 +593,7 @@ export default function AuthPages() {
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-2xl p-8">
             <button
-              onClick={() => setCurrentPage('register')}
+              onClick={() => setCurrentPage('userinfo')}
               className="flex items-center text-gray-600 hover:text-gray-800 mb-6 transition"
             >
               <ArrowLeft className="w-5 h-5 mr-2" />

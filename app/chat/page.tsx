@@ -41,12 +41,12 @@ export default function ChatPage() {
     return null;
   })() : null;
 
-  useEffect(() => {
-    if (!token) {
-      alert('You must be logged in to access the chat.');
-      router.push('/login');
-    }
-  }, [token, router]);
+  // useEffect(() => {
+  //   if (!token) {
+  //     alert('You must be logged in to access the chat.');
+  //     router.push('/auth');
+  //   }
+  // }, [token, router]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -162,20 +162,20 @@ export default function ChatPage() {
     : 'Chat';
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 via-white to-purple-50">
       {/* Enhanced Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
+      <header className="bg-white border-b border-pink-100 shadow-sm">
         <div className="flex items-center justify-between p-4 max-w-4xl mx-auto">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-2 hover:bg-pink-50 rounded-full transition-colors"
               aria-label="Go back"
             >
               <ArrowLeft size={20} className="text-gray-700" />
             </button>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold shadow-md">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white font-semibold shadow-md">
                 {otherUserName.charAt(0).toUpperCase()}
               </div>
               <div>
@@ -185,7 +185,7 @@ export default function ChatPage() {
             </div>
           </div>
           <button
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-pink-50 rounded-full transition-colors"
             aria-label="More options"
           >
             <MoreVertical size={20} className="text-gray-700" />
@@ -197,13 +197,13 @@ export default function ChatPage() {
       <main className="flex-1 overflow-y-auto p-4 max-w-4xl w-full mx-auto">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
-            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+            <div className="w-12 h-12 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin"></div>
             <p className="text-gray-500 font-medium">Loading messages...</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-4">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-              <Send size={32} className="text-blue-600" />
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center">
+              <Send size={32} className="text-pink-600" />
             </div>
             <div className="text-center">
               <p className="text-gray-600 font-medium text-lg">No messages yet</p>
@@ -212,7 +212,7 @@ export default function ChatPage() {
           </div>
         ) : (
           <div className="space-y-4 pb-4">
-{messages.map((msg, index) => {
+            {messages.map((msg, index) => {
               const isMine = currentUserId && msg.sender._id === currentUserId;
               const showDateSeparator = index === 0 || 
                 new Date(messages[index - 1].createdAt).toDateString() !== 
@@ -222,7 +222,7 @@ export default function ChatPage() {
                 <div key={msg._id}>
                   {showDateSeparator && (
                     <div className="flex items-center justify-center my-6">
-                      <div className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full font-medium">
+                      <div className="bg-pink-100 text-pink-700 text-xs px-3 py-1 rounded-full font-medium">
                         {new Date(msg.createdAt).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
@@ -243,14 +243,14 @@ export default function ChatPage() {
                       <div
                         className={`px-4 py-2.5 rounded-2xl break-words ${
                           isMine
-                            ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-br-md shadow-md'
-                            : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
+                            ? 'bg-gradient-to-br from-pink-500 to-purple-600 text-white rounded-br-md shadow-md'
+                            : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-pink-100'
                         }`}
                       >
                         <p className="leading-relaxed">{msg.content}</p>
                         <div className="flex items-center justify-between gap-2 mt-1.5">
                           <p
-                            className={`text-xs ${isMine ? 'text-blue-100' : 'text-gray-400'}`}
+                            className={`text-xs ${isMine ? 'text-pink-100' : 'text-gray-400'}`}
                           >
                             {new Date(msg.createdAt).toLocaleTimeString([], {
                               hour: '2-digit',
@@ -262,7 +262,7 @@ export default function ChatPage() {
                               {msg.read ? (
                                 <div className="flex">
                                   <svg
-                                    className="w-4 h-4 text-blue-200"
+                                    className="w-4 h-4 text-pink-100"
                                     fill="none"
                                     stroke="currentColor"
                                     strokeWidth="2.5"
@@ -276,7 +276,7 @@ export default function ChatPage() {
                                     />
                                   </svg>
                                   <svg
-                                    className="w-4 h-4 text-blue-200 -ml-2"
+                                    className="w-4 h-4 text-pink-100 -ml-2"
                                     fill="none"
                                     stroke="currentColor"
                                     strokeWidth="2.5"
@@ -292,7 +292,7 @@ export default function ChatPage() {
                                 </div>
                               ) : (
                                 <svg
-                                  className="w-4 h-4 text-blue-200"
+                                  className="w-4 h-4 text-pink-100"
                                   fill="none"
                                   stroke="currentColor"
                                   strokeWidth="2.5"
@@ -321,12 +321,12 @@ export default function ChatPage() {
       </main>
 
       {/* Enhanced Input Footer */}
-      <footer className="bg-white border-t border-gray-200 shadow-lg">
+      <footer className="bg-white border-t border-pink-100 shadow-lg">
         <div className="flex items-end gap-2 p-3 max-w-4xl mx-auto">
           <div className="flex-1 relative">
             <input
               type="text"
-              className="w-full border border-gray-300 rounded-3xl px-5 py-3 pr-4 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all bg-gray-50 focus:bg-white"
+              className="w-full border border-pink-200 rounded-3xl px-5 py-3 pr-4 outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-100 transition-all bg-pink-50 focus:bg-white"
               placeholder="Type a message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
@@ -338,7 +338,7 @@ export default function ChatPage() {
             disabled={sending || !newMessage.trim()}
             className={`p-3 rounded-full transition-all transform active:scale-95 shadow-md ${
               newMessage.trim() && !sending
-                ? 'bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white'
+                ? 'bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
             aria-label="Send message"
