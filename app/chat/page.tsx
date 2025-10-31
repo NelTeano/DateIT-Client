@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { Suspense, useEffect, useState, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Send, ArrowLeft, MoreVertical } from 'lucide-react';
 
@@ -21,7 +21,20 @@ interface Match {
   status: string;
 }
 
-export default function ChatPage() {
+// Loading fallback component
+function ChatLoadingFallback() {
+  return (
+    <div className="flex flex-col h-screen bg-gradient-to-br from-pink-50 via-white to-purple-50">
+      <div className="flex items-center justify-center h-full gap-3">
+        <div className="w-12 h-12 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin"></div>
+        <p className="text-gray-500 font-medium">Loading chat...</p>
+      </div>
+    </div>
+  );
+}
+
+// Main chat component with search params
+function ChatPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const matchId = searchParams.get('matchId');
@@ -127,9 +140,8 @@ export default function ChatPage() {
 
     const intervalId = setInterval(() => {
       fetchMessages(false);
-    }, 7000); // 7 seconds
+    }, 7000);
 
-    // Cleanup interval on unmount
     return () => clearInterval(intervalId);
   }, [matchId, token]);
 
@@ -197,7 +209,6 @@ export default function ChatPage() {
       if (data.success) {
         setMessages((prev) => [...prev, data.message]);
         setNewMessage('');
-        // Scroll to bottom after sending
         setTimeout(() => {
           chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, 100);
@@ -420,5 +431,14 @@ export default function ChatPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+// Main export with Suspense boundary
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<ChatLoadingFallback />}>
+      <ChatPageContent />
+    </Suspense>
   );
 }
