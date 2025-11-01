@@ -46,20 +46,22 @@ export default function MyMatches() {
       return;
     }
 
-    fetchMatches();
-    fetchPendingRequests();
+    fetchMatches(true); // Initial load
+    fetchPendingRequests(true); // Initial load
 
     const interval = setInterval(() => {
-      fetchMatches();
-      fetchPendingRequests();
+      fetchMatches(false); // Silent refresh
+      fetchPendingRequests(false); // Silent refresh
     }, 10000);
 
     return () => clearInterval(interval);
   }, [token, currentUserId]);
 
-  const fetchMatches = async () => {
+  const fetchMatches = async (isInitialLoad = false) => {
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       setError('');
 
       const response = await fetch(`${API_URL}/matches/my-matches`, {
@@ -75,11 +77,9 @@ export default function MyMatches() {
       }
 
       if (data.success) {
-        // INCLUDE ALL MATCHES (active and ended)
         const allMatches = data.matches || [];
         setMatches(allMatches);
         
-        // Only fetch unread counts for active matches
         if (allMatches && allMatches.length > 0) {
           allMatches.forEach(match => {
             if (match.status === 'active') {
@@ -90,12 +90,17 @@ export default function MyMatches() {
       }
     } catch (err) {
       console.error('Error fetching matches:', err);
-      setError(err.message || 'Failed to load matches. Please try again.');
+      if (isInitialLoad) {
+        setError(err.message || 'Failed to load matches. Please try again.');
+      }
     } finally {
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      }
     }
   };
-  const fetchPendingRequests = async () => {
+
+  const fetchPendingRequests = async (isInitialLoad = false) => {
     try {
       const response = await fetch(`${API_URL}/matches/pending-requests`, {
         headers: {
@@ -235,7 +240,7 @@ export default function MyMatches() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchMatches(), fetchPendingRequests()]);
+    await Promise.all([fetchMatches(false), fetchPendingRequests(false)]);
     setRefreshing(false);
   };
 
@@ -265,7 +270,6 @@ export default function MyMatches() {
     const otherUser = getOtherUser(match);
     return otherUser?.name.toLowerCase().includes(searchQuery.toLowerCase());
   });
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4">
@@ -329,7 +333,6 @@ export default function MyMatches() {
             </div>
           )}
 
-          {/* Pending Requests Section */}
           {pendingRequests.length > 0 && (
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -393,7 +396,6 @@ export default function MyMatches() {
             </div>
           )}
 
-          {/* Active Matches Section */}
           <div>
             <h2 className="text-lg font-semibold text-gray-800 mb-4">
               Active Matches ({matches.length})
@@ -440,7 +442,6 @@ export default function MyMatches() {
                           isEnded ? 'opacity-60 border-2 border-red-200' : ''
                         }`}
                       >
-                        {/* Ended Badge */}
                         {isEnded && (
                           <div className="mb-3 flex items-center justify-center">
                             <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-2">
@@ -533,7 +534,6 @@ export default function MyMatches() {
         </div>
       </main>
 
-      {/* Match Popup Modal */}
       {showMatchPopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50">
           <div className="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-sm w-full animate-pop-in relative overflow-hidden">
@@ -572,7 +572,6 @@ export default function MyMatches() {
         </div>
       )}
 
-      {/* Unmatch Confirmation Modal */}
       {showUnmatchModal && selectedMatch && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">

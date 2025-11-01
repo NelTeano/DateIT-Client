@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { Heart, X, MapPin, Briefcase, Info, Calendar, Loader2 } from 'lucide-react';
+import { Heart, X, MapPin, Briefcase, Info, Calendar, Loader2, Check } from 'lucide-react';
 
 interface Card {
   _id: string;
@@ -21,7 +21,11 @@ export default function TinderCards() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [matchNotification, setMatchNotification] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingAction, setProcessingAction] = useState<'love' | 'nope' | null>(null);
+  const [showProcessingToast, setShowProcessingToast] = useState(false);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const API_URL = `${process.env.NEXT_PUBLIC_PROD_API_URL}/api`;
   const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
@@ -34,6 +38,15 @@ export default function TinderCards() {
     }
     fetchSuggestions();
   }, [token]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (processingTimeoutRef.current) {
+        clearTimeout(processingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const fetchSuggestions = async () => {
     try {
@@ -97,6 +110,12 @@ export default function TinderCards() {
   };
 
   const handleDragStart = (e: DragEventType) => {
+    if (isProcessing) {
+      setShowProcessingToast(true);
+      setTimeout(() => setShowProcessingToast(false), 1500);
+      return;
+    }
+    
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     setDragStart({ x: clientX, y: clientY });
@@ -104,7 +123,7 @@ export default function TinderCards() {
   };
 
   const handleDragMove = (e: DragEventType | MouseEvent) => {
-    if (!isDragging) return;
+    if (!isDragging || isProcessing) return;
 
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
@@ -120,7 +139,7 @@ export default function TinderCards() {
   };
 
   const handleDragEnd = () => {
-    if (!isDragging) return;
+    if (!isDragging || isProcessing) return;
     setIsDragging(false);
 
     const threshold = 80;
@@ -133,25 +152,59 @@ export default function TinderCards() {
   };
 
   const removeCard = async (isLove: boolean) => {
-    if (cards.length === 0) return;
-
-    const currentCard = cards[0];
-
-    // Call API
-    if (isLove) {
-      await handleLike(currentCard._id);
-    } else {
-      await handlePass(currentCard._id);
+    if (cards.length === 0 || isProcessing) {
+      if (isProcessing) {
+        setShowProcessingToast(true);
+        setTimeout(() => setShowProcessingToast(false), 1500);
+      }
+      return;
     }
 
-    // Remove card from UI
-    setCards((prev) => prev.slice(1));
-    setDragOffset({ x: 0, y: 0 });
-    setStatus(null);
+    // Immediately set processing flag to prevent double swipes
+    setIsProcessing(true);
+    setProcessingAction(isLove ? 'love' : 'nope');
+
+    const currentCard = cards[0];
+    const currentCardName = currentCard.name;
+
+    try {
+      // Call API
+      if (isLove) {
+        await handleLike(currentCard._id);
+      } else {
+        await handlePass(currentCard._id);
+      }
+
+      // Remove card from UI with a small delay to ensure smooth animation
+      setTimeout(() => {
+        setCards((prev) => prev.slice(1));
+        setDragOffset({ x: 0, y: 0 });
+        setStatus(null);
+        
+        // Reset processing flag after card is removed
+        processingTimeoutRef.current = setTimeout(() => {
+          setIsProcessing(false);
+          setProcessingAction(null);
+        }, 300);
+      }, 100);
+    } catch (error) {
+      console.error('Error processing card:', error);
+      // Reset on error
+      setDragOffset({ x: 0, y: 0 });
+      setStatus(null);
+      setIsProcessing(false);
+      setProcessingAction(null);
+    }
   };
 
   const handleButtonClick = (isLove: boolean) => {
-    if (cards.length === 0) return;
+    if (cards.length === 0 || isProcessing) {
+      if (isProcessing) {
+        setShowProcessingToast(true);
+        setTimeout(() => setShowProcessingToast(false), 1500);
+      }
+      return;
+    }
     removeCard(isLove);
   };
 
@@ -168,15 +221,26 @@ export default function TinderCards() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, dragStart, dragOffset]);
+  }, [isDragging, dragStart, dragOffset, isProcessing]);
 
   const getCardStyle = (index: number): React.CSSProperties => {
-    if (index === 0 && isDragging) {
+    if (index === 0 && isDragging && !isProcessing) {
       const rotate = dragOffset.x * 0.03 * (dragOffset.y / 80);
       return {
         transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) rotate(${rotate}deg)`,
         transition: 'none',
         cursor: 'grabbing',
+      };
+    }
+
+    // Add exit animation for processing card
+    if (index === 0 && isProcessing) {
+      const exitX = processingAction === 'love' ? 500 : processingAction === 'nope' ? -500 : 0;
+      return {
+        transform: `translateX(${exitX}px) rotate(${exitX * 0.05}deg)`,
+        transition: 'transform 0.3s ease-out, opacity 0.3s ease-out',
+        opacity: 0,
+        zIndex: cards.length,
       };
     }
 
@@ -188,6 +252,7 @@ export default function TinderCards() {
       transform: `scale(${scale}) translateY(${translateY}px)`,
       opacity,
       zIndex: cards.length - index,
+      transition: 'transform 0.3s ease-out, opacity 0.3s ease-out',
     };
   };
 
@@ -216,6 +281,41 @@ export default function TinderCards() {
 
   return (
     <div className="w-full h-full overflow-hidden flex flex-col relative">
+      {/* Processing Toast Notification */}
+      {showProcessingToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top fade-in duration-300">
+          <div className="bg-white shadow-2xl rounded-2xl px-6 py-4 flex items-center gap-3 border-2 border-pink-200">
+            <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center">
+              <Loader2 className="w-5 h-5 text-white animate-spin" />
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800">Processing...</p>
+              <p className="text-sm text-gray-600">Please wait a moment</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Processing Indicator Overlay */}
+      {isProcessing && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top duration-300">
+          <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-2xl rounded-full px-6 py-3 flex items-center gap-3">
+            {processingAction === 'love' ? (
+              <>
+                <Heart className="w-5 h-5" fill="white" />
+                <span className="font-semibold">Liking...</span>
+              </>
+            ) : (
+              <>
+                <X className="w-5 h-5" />
+                <span className="font-semibold">Passing...</span>
+              </>
+            )}
+            <Loader2 className="w-4 h-4 animate-spin" />
+          </div>
+        </div>
+      )}
+
       {/* Match Notification */}
       {matchNotification && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in">
@@ -268,13 +368,33 @@ export default function TinderCards() {
               ref={(el) => {
                 cardRefs.current[index] = el;
               }}              
-              className="absolute inset-0 bg-white rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 ease-in-out"
+              className="absolute inset-0 bg-white rounded-3xl overflow-hidden shadow-2xl"
               style={getCardStyle(index)}
-              onMouseDown={index === 0 ? handleDragStart : undefined}
-              onTouchStart={index === 0 ? handleDragStart : undefined}
-              onTouchMove={index === 0 ? handleDragMove : undefined}
-              onTouchEnd={index === 0 ? handleDragEnd : undefined}
+              onMouseDown={index === 0 && !isProcessing ? handleDragStart : undefined}
+              onTouchStart={index === 0 && !isProcessing ? handleDragStart : undefined}
+              onTouchMove={index === 0 && !isProcessing ? handleDragMove : undefined}
+              onTouchEnd={index === 0 && !isProcessing ? handleDragEnd : undefined}
             >
+              {/* Processing overlay on top card */}
+              {index === 0 && isProcessing && (
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                  <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-2xl px-8 py-6 flex flex-col items-center gap-3 shadow-2xl">
+                    {processingAction === 'love' ? (
+                      <Heart className="w-12 h-12" fill="white" />
+                    ) : (
+                      <X className="w-12 h-12" />
+                    )}
+                    <div className="text-center">
+                      <p className="font-bold text-lg">
+                        {processingAction === 'love' ? 'Sending Like...' : 'Passing...'}
+                      </p>
+                      <p className="text-sm text-pink-100">Please wait</p>
+                    </div>
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
+                </div>
+              )}
+
               {/* Card Image */}
               <div className="relative h-3/4">
                 <img
@@ -315,7 +435,7 @@ export default function TinderCards() {
             </div>
           ))}
 
-          {cards.length === 0 && (
+          {cards.length === 0 && !isProcessing && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-white rounded-3xl shadow-2xl">
               <div className="w-24 h-24 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-6">
                 <Heart className="w-12 h-12 text-white" fill="white" />
@@ -337,15 +457,19 @@ export default function TinderCards() {
       <div className="flex-shrink-0 h-24 flex justify-center items-center gap-6 pb-6">
         <button
           onClick={() => handleButtonClick(false)}
-          className="w-16 h-16 rounded-full bg-white shadow-xl flex items-center justify-center hover:scale-110 transition-transform active:scale-95 focus:outline-none border-2 border-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={cards.length === 0}
+          className={`w-16 h-16 rounded-full bg-white shadow-xl flex items-center justify-center hover:scale-110 transition-transform active:scale-95 focus:outline-none border-2 border-red-100 ${
+            (cards.length === 0 || isProcessing) ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
+          disabled={cards.length === 0 || isProcessing}
         >
           <X className="w-9 h-9 text-red-500" strokeWidth={2.5} />
         </button>
         <button
           onClick={() => handleButtonClick(true)}
-          className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 shadow-xl flex items-center justify-center hover:scale-110 transition-transform active:scale-95 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={cards.length === 0}
+          className={`w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 shadow-xl flex items-center justify-center hover:scale-110 transition-transform active:scale-95 focus:outline-none ${
+            (cards.length === 0 || isProcessing) ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
+          disabled={cards.length === 0 || isProcessing}
         >
           <Heart className="w-9 h-9 text-white" strokeWidth={2.5} fill="white" />
         </button>
